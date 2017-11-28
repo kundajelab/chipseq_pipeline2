@@ -8,12 +8,15 @@ import os
 import argparse
 from encode_common import *
 from encode_blacklist_filter import blacklist_filter
+from encode_frip import frip_shifted
 
 def parse_arguments():
     parser = argparse.ArgumentParser(prog='ENCODE DCC MACS2 callpeak',
                                         description='')
     parser.add_argument('ta', type=str,
                         help='Path for TAGALIGN file.')
+    parser.add_argument('--ctl-ta', type=str, nargs='*',
+                        help='Path for control TAGALIGN file.')
     parser.add_argument('--fraglen', type=int, required=True,
                         help='Fragment length.')
     parser.add_argument('--chrsz', type=str,
@@ -38,12 +41,15 @@ def parse_arguments():
                             'WARNING','CRITICAL','ERROR','CRITICAL'],
                         help='Log level')
     args = parser.parse_args()
-
+    if args.ctl_ta:
+        args.ctl_ta = args.ctl_ta[0]
+    else:
+        args.ctl_ta = ''
     log.setLevel(args.log_level)
     log.info(sys.argv)
     return args
 
-def macs2(ta, ctl_ta, chrsz, gensz, pval_thresh, smooth_win, cap_num_peak, 
+def macs2(ta, ctl_ta, chrsz, gensz, pval_thresh, fraglen, cap_num_peak, 
         make_signal, out_dir):
     basename_ta = os.path.basename(strip_ext_ta(ta))
     basename_ctl_ta = os.path.basename(strip_ext_ta(ctl_ta))
@@ -64,7 +70,6 @@ def macs2(ta, ctl_ta, chrsz, gensz, pval_thresh, smooth_win, cap_num_peak,
     pval_bedgraph = '{}.pval.signal.bedgraph'.format(prefix)
     pval_bedgraph_srt = '{}.pval.signal.srt.bedgraph'.format(prefix)
 
-    shiftsize = -int(round(float(smooth_win)/2.0))
     temp_files = []
 
     cmd0 = ' macs2 callpeak '
@@ -72,7 +77,7 @@ def macs2(ta, ctl_ta, chrsz, gensz, pval_thresh, smooth_win, cap_num_peak,
     cmd0 += '--nomodel --shift {} --extsize {} --keep-dup all -B --SPMR'
     cmd0 = cmd0.format(
         ta,
-        ctl_ta,
+        '-c {}'.format(ctl_ta) if ctl_ta else '',
         prefix,
         gensz,
         pval_thresh,
@@ -185,7 +190,7 @@ def main():
     log.info('Calling peaks and generating signal tracks with MACS2...')
     npeak, fc_bigwig, pval_bigwig = macs2(
         args.ta, args.ctl_ta, args.chrsz, args.gensz, args.pval_thresh,
-        args.smooth_win, args.cap_num_peak, args.make_signal, 
+        args.fraglen, args.cap_num_peak, args.make_signal, 
         args.out_dir)
 
     if args.blacklist:
@@ -196,13 +201,9 @@ def main():
         bfilt_npeak = npeak
 
     if args.ta: # if TAG-ALIGN is given
-        if args.fraglen: # chip-seq
-            log.info('Shifted FRiP with fragment length...')
-            frip_qc = frip_shifted( args.ta, bfilt_npeak,
-                args.chrsz, args.fraglen, args.out_dir)
-        else: # atac-seq
-            log.info('FRiP without fragment length...')
-            frip_qc = frip( args.ta, bfilt_npeak, args.out_dir)
+        log.info('Shifted FRiP with fragment length...')
+        frip_qc = frip_shifted( args.ta, bfilt_npeak,
+            args.chrsz, args.fraglen, args.out_dir)
     else:
         frip_qc = '/dev/null'
 

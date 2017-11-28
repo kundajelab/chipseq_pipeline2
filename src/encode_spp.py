@@ -8,13 +8,14 @@ import os
 import argparse
 from encode_common import *
 from encode_blacklist_filter import blacklist_filter
+from encode_frip import frip_shifted
 
 def parse_arguments():
     parser = argparse.ArgumentParser(prog='ENCODE DCC spp callpeak',
                                         description='')
     parser.add_argument('ta', type=str,
                         help='Path for experiment IP TAGALIGN file.')
-    parser.add_argument('ctl_ta', type=str,
+    parser.add_argument('--ctl-ta', type=str, required=True,
                         help='Path for control TAGALIGN file.')
     parser.add_argument('--chrsz', type=str,
                         help='2-col chromosome sizes file.')
@@ -50,13 +51,13 @@ def spp(ta, ctl_ta, fraglen, cap_num_peak, nth, out_dir):
         human_readable_number(cap_num_peak))
     rpeak_tmp = '{}.tmp'.format(rpeak)
 
-    cmd0 = 'Rscript ${{which run_spp.R}} -c={} -i={} '
+    cmd0 = 'Rscript $(which run_spp.R) -c={} -i={} '
     cmd0 += '-npeak={} -odir={} -speak={} -savr={} -rf -p={}'
     cmd0 = cmd0.format(
         ta,
         ctl_ta,
-        cap_num_peak_spp,
-        out_dir,
+        cap_num_peak,
+        os.path.abspath(out_dir),
         fraglen,
         rpeak_tmp,
         nth)
@@ -93,13 +94,9 @@ def main():
         bfilt_rpeak = rpeak
 
     if args.ta: # if TAG-ALIGN is given
-        if args.fraglen: # chip-seq
-            log.info('Shifted FRiP with fragment length...')
-            frip_qc = frip_shifted( args.ta, bfilt_rpeak,
-                args.chrsz, args.fraglen, args.out_dir)
-        else: # atac-seq
-            log.info('FRiP without fragment length...')
-            frip_qc = frip( args.ta, bfilt_rpeak, args.out_dir)
+        log.info('Shifted FRiP with fragment length...')
+        frip_qc = frip_shifted( args.ta, bfilt_rpeak,
+            args.chrsz, args.fraglen, args.out_dir)
     else:
         frip_qc = '/dev/null'
 

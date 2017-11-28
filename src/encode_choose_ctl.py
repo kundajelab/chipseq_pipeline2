@@ -19,9 +19,9 @@ def parse_arguments():
                         help='List of experiment TAG-ALIGN per IP replicate.')
     parser.add_argument('--ctl-tas', type=str, nargs='+', required=True,
                         help='List of control TAG-ALIGN per IP replicate.')
-    parser.add_argument('--ta-pooled', type=str, nargs='*', required=True,
+    parser.add_argument('--ta-pooled', type=str, nargs='*',
                         help='Pooled experiment TAG-ALIGN.')
-    parser.add_argument('--ctl-ta-pooled', type=str, nargs='*', required=True,
+    parser.add_argument('--ctl-ta-pooled', type=str, nargs='*',
                         help='Pooled control TAG-ALIGN.')
     parser.add_argument('--ctl-depth-ratio', type=float, required=True,
                         help='Control depth ratio.')
@@ -49,11 +49,11 @@ def main():
 
     # reproducibility QC
     log.info('Choosing appropriate control for each IP replicate...')
-    ctl_ta_idx = [0]*len(args.ta)
-    if args.ctl_tas.size()==1: # if only one control, use it for all replicates
+    ctl_ta_idx = [0]*len(args.tas)
+    if len(args.ctl_tas)==1: # if only one control, use it for all replicates
         pass
     elif args.always_use_pooled_ctl: # if --always-use-pooled-ctl, then always use pooled control
-        ctl_ta_idx = [-1]*len(args.ta)
+        ctl_ta_idx = [-1]*len(args.tas)
     else: 
         # if multiple controls, check # of lines in replicate/control tagaligns and apply ctl_depth_ratio
         # num lines in tagaligns
@@ -64,8 +64,8 @@ def main():
         # check every num lines in every pair of control tagaligns
         # if ratio of two entries in any pair > ctl_depth_ratio then use pooled control for all
         use_pooled_ctl = False
-        for i in range(len(nclines_ctl)): 
-            for j in range(i+1,len(nclines_ctl)):
+        for i in range(len(nlines_ctl)): 
+            for j in range(i+1,len(nlines_ctl)):
                 if nlines_ctl[i]/float(nlines_ctl[j]) > args.ctl_depth_ratio or \
                     nlines_ctl[j]/float(nlines_ctl[i]) > args.ctl_depth_ratio:
                     use_pooled_ctl = True
@@ -74,9 +74,9 @@ def main():
                     break
 
         if use_pooled_ctl:
-            ctl_ta_idx = [-1]*len(args.ta) # use pooled control for all exp replicates
+            ctl_ta_idx = [-1]*len(args.tas) # use pooled control for all exp replicates
         else:
-            for i in range(len(args.ta)):
+            for i in range(len(args.tas)):
                 if i>len(args.ctl_ta)-1:
                     ctl_ta_idx[i] = -1 # use pooled control
                 elif nlines_ctl[i] < nlines[i]:

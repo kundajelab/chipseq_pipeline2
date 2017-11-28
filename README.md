@@ -261,6 +261,7 @@ Optional parameters and flags are marked with `?`.
     * `"chipseq.filter.cpu"`? : Number of cores for `filter` (default: 2).
     * `"chipseq.bam2ta.cpu"`? : Number of cores for `bam2ta` (default: 2).
     * `"chipseq.xcor.cpu"`? : Number of cores for `xcor` (default: 2).
+    * `"chipseq.spp_cpu"`? : Number of cores for `spp` (default: 2).
     * `"chipseq.merge_fastq.mem_mb"`? : Max. memory limit in MB for `merge_fastq` (default: 10000).
     * `"chipseq.bowtie2.mem_mb"`? : Max. memory limit in MB for `bowtie2` (default: 20000).
     * `"chipseq.filter.mem_mb"`? : Max. memory limit in MB for `filter` (default: 20000).
@@ -268,7 +269,7 @@ Optional parameters and flags are marked with `?`.
     * `"chipseq.xcor.mem_mb"`? : Max. memory limit in MB for `xcor` (default: 10000).
     * `"chipseq.macs2_mem_mb"`? : Max. memory limit in MB for `macs2` (default: 16000).
     * `"chipseq.spp_mem_mb"`? : Max. memory limit in MB for `spp` (default: 16000).
-
+`
     Disks (`disks`) is used for Cloud platforms (Google Cloud Platforms, AWS, ...).
 
     * `"chipseq.merge_fastq.disks"`? : Disks for `merge_fastq` (default: "local-disk 100 HDD").

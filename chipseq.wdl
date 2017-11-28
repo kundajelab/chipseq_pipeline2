@@ -59,7 +59,6 @@ workflow chipseq {
 	String? spp_disks 	# resource disks for cloud platforms
 
 	# optional for IDR
-	Boolean? enable_idr		# enable IDR analysis on raw peaks
 	Float? idr_thresh		# IDR threshold
 
 	# OTHER IMPORTANT mandatory/optional parameters are declared in a task level
@@ -75,9 +74,12 @@ workflow chipseq {
 			bams = bams,
 			nodup_bams = nodup_bams,
 			tas = tas,
+			ctl_fastqs = ctl_fastqs,
+			ctl_bams = ctl_bams,
+			ctl_nodup_bams = ctl_nodup_bams,
+			ctl_tas = ctl_tas,
 			peaks = peaks,
 			genome_tsv = genome_tsv,
-			enable_idr_ = enable_idr,
 			align_only_ = align_only,
 			true_rep_only_ = true_rep_only,
 	}
@@ -231,7 +233,6 @@ workflow chipseq {
 				ctl_ta = if inputs.num_ctl==0 then [] 
 					else if defined(bam2ta_ctl.ta[0]) && choose_ctl.idx[i]>=0 then [bam2ta_ctl.ta[(choose_ctl.idx[i])]]
 					else if choose_ctl.idx[i]<0 then [pool_ta_ctl.ta_pooled]
-					else if choose_ctl.idx[i]>=0 then [ctl_tas[(choose_ctl.idx[i])]]
 					else [ctl_tas[(choose_ctl.idx[i])]],
 				gensz = inputs.gensz,
 				chrsz = inputs.chrsz,
@@ -245,13 +246,12 @@ workflow chipseq {
 				time_hr = macs2_time_hr,
 			}
 		}
-		if ( !inputs.align_only && inputs.is_before_peak && peak_caller=='spp' ) {
+		if ( !inputs.align_only && inputs.is_before_peak && inputs.peak_caller=='spp' ) {
 			# call peaks on tagalign
 			call spp { input :
 				ta = if defined(bam2ta.ta[0]) then bam2ta.ta[i] else tas[i],
 				ctl_ta = if defined(bam2ta_ctl.ta[0]) && choose_ctl.idx[i]>=0 then bam2ta_ctl.ta[(choose_ctl.idx[i])]
 					else if choose_ctl.idx[i]<0 then pool_ta_ctl.ta_pooled
-					else if choose_ctl.idx[i]>=0 then ctl_tas[(choose_ctl.idx[i])]
 					else ctl_tas[(choose_ctl.idx[i])],
 				chrsz = inputs.chrsz,
 				cap_num_peak = cap_num_peak,
@@ -285,7 +285,7 @@ workflow chipseq {
 			disks = macs2_disks,
 			time_hr = macs2_time_hr,
 		}
-		if ( peak_caller=='spp' ) {
+		if ( inputs.peak_caller=='spp' ) {
 			# call peaks on pooled replicate
 			call spp as spp_pooled { input :
 				ta = pool_ta.ta_pooled,
@@ -305,14 +305,13 @@ workflow chipseq {
 	}
 	if ( !inputs.align_only && !inputs.true_rep_only ) {		
 		scatter(i in range(inputs.num_rep)) {
-			if ( inputs.is_before_peak && peak_caller=='macs2' ) {
+			if ( inputs.is_before_peak && inputs.peak_caller=='macs2' ) {
 				# call peaks on 1st pseudo replicated tagalign 
 				call macs2 as macs2_pr1 { input :
 					ta = spr.ta_pr1[i],
 					ctl_ta = if inputs.num_ctl==0 then [] 
 						else if defined(bam2ta_ctl.ta[0]) && choose_ctl.idx[i]>=0 then [bam2ta_ctl.ta[(choose_ctl.idx[i])]]
 						else if choose_ctl.idx[i]<0 then [pool_ta_ctl.ta_pooled]
-						else if choose_ctl.idx[i]>=0 then [ctl_tas[(choose_ctl.idx[i])]]
 						else [ctl_tas[(choose_ctl.idx[i])]],
 					gensz = inputs.gensz,
 					chrsz = inputs.chrsz,
@@ -329,7 +328,6 @@ workflow chipseq {
 					ctl_ta = if inputs.num_ctl==0 then [] 
 						else if defined(bam2ta_ctl.ta[0]) && choose_ctl.idx[i]>=0 then [bam2ta_ctl.ta[(choose_ctl.idx[i])]]
 						else if choose_ctl.idx[i]<0 then [pool_ta_ctl.ta_pooled]
-						else if choose_ctl.idx[i]>=0 then [ctl_tas[(choose_ctl.idx[i])]]
 						else [ctl_tas[(choose_ctl.idx[i])]],
 					gensz = inputs.gensz,
 					chrsz = inputs.chrsz,
@@ -342,13 +340,12 @@ workflow chipseq {
 					time_hr = macs2_time_hr,
 				}
 			}
-			if ( inputs.is_before_peak && peak_caller=='spp' ) {
+			if ( inputs.is_before_peak && inputs.peak_caller=='spp' ) {
 				# call peaks on 1st pseudo replicated tagalign 
 				call spp as spp_pr1 { input :
 					ta = spr.ta_pr1[i],
 					ctl_ta = if defined(bam2ta_ctl.ta[0]) && choose_ctl.idx[i]>=0 then bam2ta_ctl.ta[(choose_ctl.idx[i])]
 						else if choose_ctl.idx[i]<0 then pool_ta_ctl.ta_pooled
-						else if choose_ctl.idx[i]>=0 then ctl_tas[(choose_ctl.idx[i])]
 						else ctl_tas[(choose_ctl.idx[i])],
 					chrsz = inputs.chrsz,
 					cap_num_peak = cap_num_peak,
@@ -363,7 +360,6 @@ workflow chipseq {
 					ta = spr.ta_pr2[i],
 					ctl_ta = if defined(bam2ta_ctl.ta[0]) && choose_ctl.idx[i]>=0 then bam2ta_ctl.ta[(choose_ctl.idx[i])]
 						else if choose_ctl.idx[i]<0 then pool_ta_ctl.ta_pooled
-						else if choose_ctl.idx[i]>=0 then ctl_tas[(choose_ctl.idx[i])]
 						else ctl_tas[(choose_ctl.idx[i])],
 					chrsz = inputs.chrsz,
 					cap_num_peak = cap_num_peak,
@@ -385,15 +381,14 @@ workflow chipseq {
 				tas = spr.ta_pr2,
 			}
 		}
-		if ( inputs.is_before_peak && inputs.num_rep>1 && peak_caller=='macs2' ) {
+		if ( inputs.is_before_peak && inputs.num_rep>1 && inputs.peak_caller=='macs2' ) {
 			# call peaks on 1st pooled pseudo replicates
 			call macs2 as macs2_ppr1 { input :
 				ta = pool_ta_pr1.ta_pooled,
 				ctl_ta = if inputs.num_ctl==0 then [] 
-					else if defined(bam2ta_ctl.ta[0]) && choose_ctl.idx[i]>=0 then [bam2ta_ctl.ta[(choose_ctl.idx[i])]]
-					else if choose_ctl.idx[i]<0 then [pool_ta_ctl.ta_pooled]
-					else if choose_ctl.idx[i]>=0 then [ctl_tas[(choose_ctl.idx[i])]]
-					else [ctl_tas[(choose_ctl.idx[i])]],
+					else if defined(pool_ta_ctl.ta_pooled) then [pool_ta_ctl.ta_pooled]
+					else if defined(bam2ta_ctl.ta[0]) then [bam2ta_ctl.ta[0]]
+					else [ctl_tas[0]],
 				gensz = inputs.gensz,
 				chrsz = inputs.chrsz,
 				cap_num_peak = cap_num_peak,
@@ -408,10 +403,9 @@ workflow chipseq {
 			call macs2 as macs2_ppr2 { input :
 				ta = pool_ta_pr2.ta_pooled,
 				ctl_ta = if inputs.num_ctl==0 then [] 
-					else if defined(bam2ta_ctl.ta[0]) && choose_ctl.idx[i]>=0 then [bam2ta_ctl.ta[(choose_ctl.idx[i])]]
-					else if choose_ctl.idx[i]<0 then [pool_ta_ctl.ta_pooled]
-					else if choose_ctl.idx[i]>=0 then [ctl_tas[(choose_ctl.idx[i])]]
-					else [ctl_tas[(choose_ctl.idx[i])]],
+					else if defined(pool_ta_ctl.ta_pooled) then [pool_ta_ctl.ta_pooled]
+					else if defined(bam2ta_ctl.ta[0]) then [bam2ta_ctl.ta[0]]
+					else [ctl_tas[0]],
 				gensz = inputs.gensz,
 				chrsz = inputs.chrsz,
 				cap_num_peak = cap_num_peak,
@@ -423,14 +417,13 @@ workflow chipseq {
 				time_hr = macs2_time_hr,
 			}
 		}
-		if ( inputs.is_before_peak && inputs.num_rep>1 && peak_caller=='spp' ) {
+		if ( inputs.is_before_peak && inputs.num_rep>1 && inputs.peak_caller=='spp' ) {
 			# call peaks on 1st pooled pseudo replicates
 			call spp as spp_ppr1 { input :
 				ta = pool_ta_pr1.ta_pooled,
-				ctl_ta = if defined(bam2ta_ctl.ta[0]) && choose_ctl.idx[i]>=0 then bam2ta_ctl.ta[(choose_ctl.idx[i])]
-					else if choose_ctl.idx[i]<0 then pool_ta_ctl.ta_pooled
-					else if choose_ctl.idx[i]>=0 then ctl_tas[(choose_ctl.idx[i])]
-					else ctl_tas[(choose_ctl.idx[i])],
+				ctl_ta = if defined(pool_ta_ctl.ta_pooled) then pool_ta_ctl.ta_pooled
+						else if defined(bam2ta_ctl.ta[0]) then bam2ta_ctl.ta[0]
+						else ctl_tas[0],
 				chrsz = inputs.chrsz,
 				cap_num_peak = cap_num_peak,
 				fraglen = fraglen_mean.rounded_mean,
@@ -443,10 +436,9 @@ workflow chipseq {
 			# call peaks on 2nd pooled pseudo replicates
 			call spp as spp_ppr2 { input :
 				ta = pool_ta_pr2.ta_pooled,
-				ctl_ta = if defined(bam2ta_ctl.ta[0]) && choose_ctl.idx[i]>=0 then bam2ta_ctl.ta[(choose_ctl.idx[i])]
-					else if choose_ctl.idx[i]<0 then pool_ta_ctl.ta_pooled
-					else if choose_ctl.idx[i]>=0 then ctl_tas[(choose_ctl.idx[i])]
-					else ctl_tas[(choose_ctl.idx[i])],
+				ctl_ta = if defined(pool_ta_ctl.ta_pooled) then pool_ta_ctl.ta_pooled
+						else if defined(bam2ta_ctl.ta[0]) then bam2ta_ctl.ta[0]
+						else ctl_tas[0],
 				chrsz = inputs.chrsz,
 				cap_num_peak = cap_num_peak,
 				fraglen = fraglen_mean.rounded_mean,
@@ -464,19 +456,19 @@ workflow chipseq {
 		scatter( pair in inputs.pairs ) {
 			call overlap { input :
 				prefix = "rep"+(pair[0]+1)+"-rep"+(pair[1]+1),
-				peak1 = if inputs.is_before_peak && peak_caller=='macs2' then macs2.npeak[(pair[0])] 
-						else if inputs.is_before_peak && peak_caller=='spp' then spp.rpeak[(pair[0])] 
+				peak1 = if inputs.is_before_peak && inputs.peak_caller=='macs2' then macs2.npeak[(pair[0])] 
+						else if inputs.is_before_peak && inputs.peak_caller=='spp' then spp.rpeak[(pair[0])] 
 						else peaks[(pair[0])],
-				peak2 = if inputs.is_before_peak && peak_caller=='macs2' then macs2.npeak[(pair[1])]
-						else if inputs.is_before_peak && peak_caller=='spp' then spp.rpeak[(pair[1])]
+				peak2 = if inputs.is_before_peak && inputs.peak_caller=='macs2' then macs2.npeak[(pair[1])]
+						else if inputs.is_before_peak && inputs.peak_caller=='spp' then spp.rpeak[(pair[1])]
 						else peaks[(pair[1])],
-				peak_pooled = if inputs.is_before_peak && peak_caller=='macs2' then macs2_pooled.npeak
-						else if inputs.is_before_peak && peak_caller=='spp' then spp_pooled.rpeak
+				peak_pooled = if inputs.is_before_peak && inputs.peak_caller=='macs2' then macs2_pooled.npeak
+						else if inputs.is_before_peak && inputs.peak_caller=='spp' then spp_pooled.rpeak
 						else peak_pooled,
 				peak_type = inputs.peak_type,
 				blacklist = if inputs.has_blacklist then [inputs.blacklist] else [],
 				chrsz = inputs.chrsz,
-				fraglen = if inputs.is_before_peak then 0 else fraglen_mean.rounded_mean,
+				fraglen = if inputs.is_before_peak then fraglen_mean.rounded_mean else 0,
 				ta = if inputs.is_before_peak then [pool_ta.ta_pooled] else [],
 			}
 		}
@@ -486,19 +478,19 @@ workflow chipseq {
 		scatter( i in range(inputs.num_rep) ) {
 			call overlap as overlap_pr { input : 
 				prefix = "rep"+(i+1)+"-pr",
-				peak1 = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_pr1.npeak[i]
-						else if inputs.is_before_peak && peak_caller=='spp'  then spp_pr1.rpeak[i]
+				peak1 = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_pr1.npeak[i]
+						else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_pr1.rpeak[i]
 						else peaks_pr1[i],
-				peak2 = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_pr2.npeak[i]
-						else if inputs.is_before_peak && peak_caller=='spp'  then spp_pr2.rpeak[i]
+				peak2 = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_pr2.npeak[i]
+						else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_pr2.rpeak[i]
 						else peaks_pr2[i],
-				peak_pooled = if inputs.is_before_peak && peak_caller=='macs2'  then macs2.npeak[i]
-						else if inputs.is_before_peak && peak_caller=='spp'  then spp.rpeak[i]
+				peak_pooled = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2.npeak[i]
+						else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp.rpeak[i]
 						else peak_pooled,
 				peak_type = inputs.peak_type,
 				blacklist = if inputs.has_blacklist then [inputs.blacklist] else [],
 				chrsz = inputs.chrsz,
-				fraglen = if inputs.is_before_peak then 0 else xcor.fraglen[i],
+				fraglen = if inputs.is_before_peak then xcor.fraglen[i] else 0,
 				ta = if inputs.is_before_ta then [bam2ta.ta[i]]
 						else if inputs.is_before_peak then [tas[i]]
 						else [],
@@ -509,19 +501,19 @@ workflow chipseq {
 		# Naive overlap on pooled pseudo replicates
 		call overlap as overlap_ppr { input : 
 			prefix = "ppr",
-			peak1 = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_ppr1.npeak
-					else if inputs.is_before_peak && peak_caller=='spp'  then spp_ppr1.rpeak
+			peak1 = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_ppr1.npeak
+					else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_ppr1.rpeak
 					else peak_ppr1,
-			peak2 = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_ppr2.npeak
-					else if inputs.is_before_peak && peak_caller=='spp'  then spp_ppr2.rpeak
+			peak2 = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_ppr2.npeak
+					else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_ppr2.rpeak
 					else peak_ppr2,
-			peak_pooled = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_pooled.npeak
-					else if inputs.is_before_peak && peak_caller=='spp'  then spp_pooled.rpeak
+			peak_pooled = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_pooled.npeak
+					else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_pooled.rpeak
 					else peak_pooled,
 			peak_type = inputs.peak_type,
 			blacklist = if inputs.has_blacklist then [inputs.blacklist] else [],
 			chrsz = inputs.chrsz,
-			fraglen = if inputs.is_before_peak then 0 else fraglen_mean.rounded_mean,
+			fraglen = if inputs.is_before_peak then fraglen_mean.rounded_mean else 0,
 			ta = if inputs.is_before_peak then [pool_ta.ta_pooled]
 					else [],
 		}
@@ -541,20 +533,20 @@ workflow chipseq {
 		scatter( pair in inputs.pairs ) {
 			call idr { input : 
 				prefix = "rep"+(pair[0]+1)+"-rep"+(pair[1]+1),
-				peak1 = if inputs.is_before_peak && peak_caller=='macs2'  then macs2.npeak[(pair[0])]
-						else if inputs.is_before_peak && peak_caller=='spp'  then spp.rpeak[(pair[0])]
+				peak1 = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2.npeak[(pair[0])]
+						else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp.rpeak[(pair[0])]
 						else peaks[(pair[0])],
-				peak2 = if inputs.is_before_peak && peak_caller=='macs2'  then macs2.npeak[(pair[1])]
-						else if inputs.is_before_peak && peak_caller=='spp'  then spp.rpeak[(pair[1])]
+				peak2 = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2.npeak[(pair[1])]
+						else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp.rpeak[(pair[1])]
 						else peaks[(pair[1])],
-				peak_pooled = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_pooled.npeak 
-						else if inputs.is_before_peak && peak_caller=='spp'  then spp_pooled.rpeak 
+				peak_pooled = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_pooled.npeak 
+						else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_pooled.rpeak 
 						else peak_pooled,
 				idr_thresh = select_first([idr_thresh,0.05]),
 				peak_type = inputs.peak_type,
 				blacklist = if inputs.has_blacklist then [inputs.blacklist] else [],
 				chrsz = inputs.chrsz,
-				fraglen = if inputs.is_before_peak then 0 else fraglen_mean.rounded_mean,
+				fraglen = if inputs.is_before_peak then fraglen_mean.rounded_mean else 0,
 				ta = if inputs.is_before_peak then [pool_ta.ta_pooled] else [],
 			}
 		}
@@ -564,20 +556,20 @@ workflow chipseq {
 		scatter( i in range(inputs.num_rep) ) {
 			call idr as idr_pr { input : 
 				prefix = "rep"+(i+1)+"-pr",
-				peak1 = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_pr1.npeak[i]
-						else if inputs.is_before_peak && peak_caller=='spp'  then spp_pr1.rpeak[i]
+				peak1 = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_pr1.npeak[i]
+						else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_pr1.rpeak[i]
 						else peaks_pr1[i],
-				peak2 = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_pr2.npeak[i]
-						else if inputs.is_before_peak && peak_caller=='spp'  then spp_pr2.rpeak[i]
+				peak2 = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_pr2.npeak[i]
+						else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_pr2.rpeak[i]
 						else peaks_pr2[i],
-				peak_pooled = if inputs.is_before_peak && peak_caller=='macs2'  then macs2.npeak[i]
-						else if inputs.is_before_peak && peak_caller=='spp'  then spp.rpeak[i]
+				peak_pooled = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2.npeak[i]
+						else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp.rpeak[i]
 						else peak_pooled,
 				idr_thresh = select_first([idr_thresh,0.05]),
 				peak_type = inputs.peak_type,
 				blacklist = if inputs.has_blacklist then [inputs.blacklist] else [],
 				chrsz = inputs.chrsz,
-				fraglen = if inputs.is_before_peak then 0 else xcor.fraglen[i],
+				fraglen = if inputs.is_before_peak then xcor.fraglen[i] else 0,
 				ta = if inputs.is_before_ta then [bam2ta.ta[i]]
 						else if inputs.is_before_peak then [tas[i]]
 						else [],
@@ -588,20 +580,20 @@ workflow chipseq {
 		# IDR on pooled pseduo replicates
 		call idr as idr_ppr { input : 
 			prefix = "ppr",
-			peak1 = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_ppr1.npeak
-					else if inputs.is_before_peak && peak_caller=='spp'  then spp_ppr1.rpeak
+			peak1 = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_ppr1.npeak
+					else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_ppr1.rpeak
 					else peak_ppr1,
-			peak2 = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_ppr2.npeak
-					else if inputs.is_before_peak && peak_caller=='spp'  then spp_ppr2.rpeak
+			peak2 = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_ppr2.npeak
+					else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_ppr2.rpeak
 					else peak_ppr2,
-			peak_pooled = if inputs.is_before_peak && peak_caller=='macs2'  then macs2_pooled.npeak
-					else if inputs.is_before_peak && peak_caller=='spp'  then spp_pooled.rpeak
+			peak_pooled = if inputs.is_before_peak && inputs.peak_caller=='macs2'  then macs2_pooled.npeak
+					else if inputs.is_before_peak && inputs.peak_caller=='spp'  then spp_pooled.rpeak
 					else peak_pooled,
 			idr_thresh = select_first([idr_thresh,0.05]),
 			peak_type = inputs.peak_type,
 			blacklist = if inputs.has_blacklist then [inputs.blacklist] else [],
 			chrsz = inputs.chrsz,
-			fraglen = if inputs.is_before_peak then 0 else fraglen_mean.rounded_mean,
+			fraglen = if inputs.is_before_peak then fraglen_mean.rounded_mean else 0,
 			ta = if inputs.is_before_peak then [pool_ta.ta_pooled] else [],
 		}
 	}
@@ -632,18 +624,26 @@ workflow chipseq {
 						then xcor.plot_png else [],
 		xcor_scores = if !inputs.align_only && inputs.is_before_peak
 						then xcor.score else [],
-		frip_qcs = if !inputs.align_only && inputs.is_before_peak
-						then macs2.frip_qc else [],
-		frip_qcs_pr1 = if !inputs.align_only && inputs.is_before_peak && !inputs.true_rep_only 
-						then macs2_pr1.frip_qc else [],
-		frip_qcs_pr2 = if !inputs.align_only && inputs.is_before_peak && !inputs.true_rep_only 
-						then macs2_pr2.frip_qc else [],
-		frip_qc_pooled = if !inputs.align_only && inputs.is_before_peak && inputs.num_rep>1 
-						then [macs2_pooled.frip_qc] else [],
-		frip_qc_ppr1 = if !inputs.align_only && inputs.is_before_peak && !inputs.true_rep_only && inputs.num_rep>1 
-						then [macs2_ppr1.frip_qc] else [],
-		frip_qc_ppr2 = if !inputs.align_only && inputs.is_before_peak && !inputs.true_rep_only && inputs.num_rep>1 
-						then [macs2_ppr2.frip_qc] else [],
+
+		frip_qcs = if inputs.align_only || !inputs.is_before_peak then []
+						else if peak_caller=='spp' then spp.frip_qc
+						else macs2.frip_qc,
+		frip_qcs_pr1 = if inputs.align_only || !inputs.is_before_peak || inputs.true_rep_only then []
+						else if peak_caller=='spp' then spp_pr1.frip_qc
+						else macs2_pr1.frip_qc,
+		frip_qcs_pr2 = if inputs.align_only || !inputs.is_before_peak || inputs.true_rep_only then []
+						else if peak_caller=='spp' then spp_pr2.frip_qc
+						else macs2_pr2.frip_qc,
+		frip_qc_pooled = if inputs.align_only || !inputs.is_before_peak || inputs.num_rep<=1 then []
+						else if peak_caller=='spp' then [spp_pooled.frip_qc]
+						else [macs2_pooled.frip_qc],
+		frip_qc_ppr1 = if inputs.align_only || !inputs.is_before_peak || inputs.true_rep_only || inputs.num_rep<=1 then []
+						else if peak_caller=='spp' then [spp_ppr1.frip_qc]
+						else [macs2_ppr1.frip_qc],
+		frip_qc_ppr2 = if inputs.align_only || !inputs.is_before_peak || inputs.true_rep_only || inputs.num_rep<=1 then []
+						else if peak_caller=='spp' then [spp_ppr2.frip_qc]
+						else [macs2_ppr2.frip_qc],
+
 		idr_plots = if !inputs.align_only && inputs.num_rep>1 && inputs.enable_idr 
 						then idr.idr_plot else [],
 		idr_plots_pr = if !inputs.align_only && !inputs.true_rep_only && inputs.enable_idr
@@ -791,7 +791,7 @@ task xcor {
 			${ta} \
 			${if paired_end then "--paired-end" else ""} \
 			${"--subsample " + select_first([subsample,15000000])} \
-			${"--nth " + cpu}
+			${"--nth " + select_first([cpu,2])}
 	}
 	output {
 		File plot_pdf = glob("*.cc.plot.pdf")[0]
@@ -822,7 +822,7 @@ task choose_ctl {
 			--tas ${sep=' ' tas} \
 			--ctl-tas ${sep=' ' ctl_tas} \
 			--ta-pooled ${sep=' ' ta_pooled} \
-			--ctl-pooled ${sep=' ' ctl_ta_pooled} \
+			--ctl-ta-pooled ${sep=' ' ctl_ta_pooled} \
 			${if select_first([alway_use_pooled_ctl,false]) then 
 				"--always-use-pooled-ctl" else ""} \
 			${"--ctl-depth-ratio " + select_first([ctl_depth_ratio,"1.2"])}				
@@ -836,7 +836,7 @@ task macs2 {
 	# parameters from workflow
 	File? ta
 	Array[File?] ctl_ta # not actually an array (to make it optional)
-	Int fraglen 		# fragment length from xcor
+	Int? fraglen 		# fragment length from xcor
 	File chrsz			# 2-col chromosome sizes file
 	String gensz		# Genome size (sum of entries in 2nd column of 
                         # chr. sizes file, or hs for human, ms for mouse)
@@ -890,7 +890,7 @@ task spp {
 	# parameters from workflow
 	File? ta
 	File? ctl_ta
-	Int fraglen 		# fragment length from xcor
+	Int? fraglen 		# fragment length from xcor
 	File chrsz			# 2-col chromosome sizes file
 	Int? cap_num_peak	# cap number of raw peaks called from MACS2
 	Array[File] blacklist 	# blacklist BED to filter raw peaks
@@ -905,10 +905,11 @@ task spp {
 	command {
 		python $(which encode_spp.py) \
 			${ta} \
-			--ctl-ta ${sep=' ' ctl_ta} \
+			${"--ctl-ta " + ctl_ta} \
 			${"--chrsz " + chrsz} \
 			${"--fraglen " + fraglen} \
 			${"--cap-num-peak " + select_first([cap_num_peak,300000])} \
+			${"--nth " + select_first([cpu,2])} \
 			${if length(blacklist)>0 then "--blacklist "+ blacklist[0] else ""}
 
 		# ugly part to deal with optional outputs
@@ -922,9 +923,11 @@ task spp {
 		File frip_qc = glob("*.frip.qc")[0]
 	}
 	runtime {
+		cpu : select_first([cpu,2])
 		memory : "${select_first([mem_mb,'16000'])} MB"
 		time : select_first([time_hr,72])
 		disks : select_first([disks,"local-disk 100 HDD"])
+		preemptible: 0
 	}
 }
 
@@ -1253,8 +1256,7 @@ task inputs {
 	Array[String] ctl_nodup_bams
 	Array[String] ctl_tas
 	Array[String] peaks
-	File genome_tsv
-	Boolean? enable_idr_
+	File genome_tsv	
 	Boolean? align_only_
 	Boolean? true_rep_only_
 
@@ -1269,8 +1271,8 @@ task inputs {
 		       		${length(ctl_nodup_bams)},${length(ctl_tas)}]
 		num_rep = max(arr_rep)
 		num_ctl = max(arr_ctl)
-		type_rep = name[arr_rep.index(num_rep)]
-		type_ctl = name[arr_ctl.index(num_ctl)]
+		type_rep = name_rep[arr_rep.index(num_rep)]
+		type_ctl = name_ctl[arr_ctl.index(num_ctl)]
 		with open('num_rep.txt','w') as fp:
 		    fp.write(str(num_rep)) 
 		with open('num_ctl.txt','w') as fp:
@@ -1287,10 +1289,10 @@ task inputs {
 	output {
 		# peak caller
 		String peak_caller = if peak_caller_!='' then peak_caller_
-							else if pipeline_type=='atac' || pipeline_type=='dnase' then 'macs2'
-							else if pipeline_type=='tf' then 'spp'
-							else if pipeline_type=='histone' then 'macs2'
-							else 'macs2'
+			else if pipeline_type=='atac' || pipeline_type=='dnase' then 'macs2'
+			else if pipeline_type=='tf' then 'spp'
+			else if pipeline_type=='histone' then 'macs2'
+			else 'macs2'
 		# peak file type
 		String peak_type = if peak_caller=='macs2' then 'narrowPeak'
 							else if peak_caller=='spp' then 'regionPeak'
@@ -1306,8 +1308,8 @@ task inputs {
 
 		# input types and useful booleans
 		String type = read_string("type_rep.txt")
-		Int num_rep = read_int("num_rep.txt")
 		String type_ctl = read_string("type_ctl.txt")
+		Int num_rep = read_int("num_rep.txt")
 		Int num_ctl = read_int("num_ctl.txt")
 		Boolean is_before_bam =
 			type=='fastq'
@@ -1324,7 +1326,7 @@ task inputs {
 			type_ctl=='fastq' || type_ctl=='bam'
 		Boolean is_ctl_before_ta =
 			type_ctl=='fastq' || type_ctl=='bam' ||	type_ctl=='nodup_bam'
-		Boolean	enable_idr = select_first([enable_idr_,false])
+		Boolean	enable_idr = pipeline_type=='tf'
 		Boolean align_only = select_first([align_only_,false])
 		Boolean true_rep_only = select_first([true_rep_only_,false])
 		Boolean disable_tn5_shift = pipeline_type!='atac'
